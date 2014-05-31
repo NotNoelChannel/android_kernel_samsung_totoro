@@ -935,6 +935,14 @@ static void mmc_power_up(struct mmc_host *host)
 	mmc_delay(10);
 }
 
+void mmc_power_up_brcm(struct mmc_host *host)
+{
+	pr_info("%s\n",__func__);
+	mmc_power_up(host);
+}
+
+EXPORT_SYMBOL(mmc_power_up_brcm);
+
 static void mmc_power_off(struct mmc_host *host)
 {
 	host->ios.clock = 0;
@@ -948,6 +956,15 @@ static void mmc_power_off(struct mmc_host *host)
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
 }
+
+void mmc_power_off_brcm(struct mmc_host *host)
+{
+	pr_info("%s\n",__func__);
+	mmc_power_off(host);
+}
+
+EXPORT_SYMBOL(mmc_power_off_brcm);
+
 
 /*
  * Cleanup when the last reference to the bus operator is dropped.
@@ -1097,10 +1114,11 @@ void mmc_rescan(struct work_struct *work)
 	struct mmc_host *host =
 		container_of(work, struct mmc_host, detect.work);
 	u32 ocr;
-	int err;
+	int err=0;
 	unsigned long flags;
 	int extend_wakelock = 0;
 
+	printk("%s: %s start\n", mmc_hostname(host), __func__);
 	spin_lock_irqsave(&host->lock, flags);
 
 	if (host->rescan_disable) {
@@ -1200,13 +1218,17 @@ void mmc_rescan(struct work_struct *work)
 	mmc_power_off(host);
 
 out:
+	printk("%s: %s rescann is out\n", mmc_hostname(host), __func__);
 	if (extend_wakelock)
 		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
 	else
 		wake_unlock(&mmc_delayed_work_wake_lock);
 
 	if (host->caps & MMC_CAP_NEEDS_POLL)
+	{
+		printk("%s : schedule host->detect(mmc_sd_detect)\n",__func__);
 		mmc_schedule_delayed_work(&host->detect, HZ);
+	}
 }
 
 void mmc_start_host(struct mmc_host *host)
@@ -1447,6 +1469,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		}
 		host->rescan_disable = 0;
 		spin_unlock_irqrestore(&host->lock, flags);
+		if (!host->card || host->card->type != MMC_TYPE_SDIO)
 		mmc_detect_change(host, 0);
 
 	}
